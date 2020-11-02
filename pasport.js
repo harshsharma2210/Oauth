@@ -15,7 +15,7 @@ const JwtStrategy = require('passport-jwt').Strategy;
 const ExtractJwt = require('passport-jwt').ExtractJwt;
 
 const signToken = (user) => {
-    return JWT.sign({ name: user.name, email: user.email, pic: user.pic }, "airgyaan");
+    return JWT.sign({ name: user.name, email: user.email, pic: user.pic }, "airgyaan" ,{ expiresIn: 86400 * 7 });
 }
 
 app.use(bodyParser.urlencoded({
@@ -41,9 +41,10 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // JSON WEB TOKENS STRATEGY
-var opts = {}
-opts.jwtFromRequest = ExtractJwt.fromAuthHeaderAsBearerToken();
-opts.secretOrKey = 'secret';
+const opts = {
+    jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+    secretOrKey: "airgyaan"
+}
 passport.use(new JwtStrategy(opts, function (jwt_payload, done) {
     User.findOne({ id: jwt_payload.sub }, function (err, user) {
         if (err) {
