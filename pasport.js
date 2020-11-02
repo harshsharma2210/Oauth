@@ -10,11 +10,18 @@ const cookieSession = require('cookie-session');
 const mongoose = require('mongoose');
 const passport = require('passport');
 const User = require('./models/user-model.js');
+const JWT = require('jsonwebtoken');
+const JwtStrategy = require('passport-jwt').Strategy;
+const ExtractJwt = require('passport-jwt').ExtractJwt;
 
+const signToken = (user) => {
+    return JWT.sign({ name: user.name, email: user.email, pic: user.pic }, "airgyaan");
+}
 
 app.use(bodyParser.urlencoded({
     extended: true
 }));
+app.use(express.json());
 
 // MONGOOSE SETUP
 
@@ -24,37 +31,46 @@ mongoose.connect("mongodb://localhost:27017/airgyaan", { useUnifiedTopology: tru
 
 mongoose.set("useCreateIndex", true);
 
-// For an actual app you should configure this with an experation time, better keys, proxy and secure
-app.use(cookieSession({
-    name: 'tuto-session',
-    keys: ['key1', 'key2'],
-    maxAge: 24 * 60 * 60 * 1000
-}));
 
 app.set('view engine', 'ejs');
 
-// Auth middleware that checks if the user is logged in
-const isLoggedIn = (req, res, next) => {
-    if (req.user) {
-        next();
-    } else {
-        res.redirect('/');
-    }
-}
+
 
 // Initializes passport and passport sessions
 app.use(passport.initialize());
 app.use(passport.session());
+
+// JSON WEB TOKENS STRATEGY
+var opts = {}
+opts.jwtFromRequest = ExtractJwt.fromAuthHeaderAsBearerToken();
+opts.secretOrKey = 'secret';
+passport.use(new JwtStrategy(opts, function (jwt_payload, done) {
+    User.findOne({ id: jwt_payload.sub }, function (err, user) {
+        if (err) {
+            return done(err, false);
+        }
+        if (user) {
+            return done(null, user);
+        } else {
+            return done(null, false);
+            // or you could create a new account
+        }
+    });
+}));
+
 
 // AUTH PAGE
 app.get('/', function (req, res) {
     res.render('pages/auth');
 });
 // CHANGE THE ROUTES ACC TO APP
-app.get('/success', isLoggedIn, (req, res) => {
-    res.render("pages/success", { name: req.user.name, email: req.user.email, pic: req.user.pic });
+// res.render("pages/success", { name: req.user.name, email: req.user.email, pic: req.user.pic });
+app.get('/success', passport.authenticate('jwt', { session: false }), (req, res) => {
+    res.send('Worked! User id is: ' + req.user._id);
 });
 app.get('/error', (req, res) => res.send("error logging in"));
+
+
 
 /*  Google AUTH  */
 
@@ -78,7 +94,7 @@ passport.use(new GoogleStrategy({
 },
     function (accessToken, refreshToken, profile, done) {
         // To check if a user exist
-        User.findOne({ platformId: profile.id }).then((currentUser) => {
+        User.findOne({ email: profile.emails[0].value }).then((currentUser) => {
             if (currentUser) {
                 // User Found
                 console.log("User is: " + currentUser);
@@ -108,13 +124,10 @@ app.get('/auth/google/callback',
     passport.authenticate('google', { failureRedirect: '/error' }),
     function (req, res) {
         // Successful authentication, redirect success.
+        const token = signToken(req.user);
+        console.log(token);
         res.redirect('/success');
     });
-
-app.get("/logout", (req, res) => {
-    req.logOut();
-    res.redirect("/")
-});
 
 
 /*  FACEBOOK AUTH  */
@@ -128,7 +141,7 @@ passport.use(new FacebookStrategy({
 },
     function (accessToken, refreshToken, profile, done) {
         // To check if a user exist
-        User.findOne({ platformId: profile.id }).then((currentUser) => {
+        User.findOne({ email: profile.emails[0].value }).then((currentUser) => {
             if (currentUser) {
                 // User Found
                 console.log("User is: " + currentUser);
@@ -171,7 +184,7 @@ passport.use(new LinkedInStrategy({
     scope: ['r_emailaddress', 'r_liteprofile'],
 }, function (token, tokenSecret, profile, done) {
     // To check if a user exist
-    User.findOne({ platformId: profile.id }).then((currentUser) => {
+    User.findOne({ email: profile.emails[0].value }).then((currentUser) => {
         if (currentUser) {
             // User Found
             console.log("User is: " + currentUser);
