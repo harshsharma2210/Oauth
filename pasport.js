@@ -15,7 +15,7 @@ const JwtStrategy = require('passport-jwt').Strategy;
 const ExtractJwt = require('passport-jwt').ExtractJwt;
 
 const signToken = (user) => {
-    return JWT.sign({ name: user.name, email: user.email, pic: user.pic }, "airgyaan" ,{ expiresIn: 86400 * 7 });
+    return JWT.sign({ id:user._id,name: user.name, email: user.email, pic: user.pic }, "airgyaan" ,{ expiresIn: 86400 * 7 });
 }
 
 app.use(bodyParser.urlencoded({
@@ -46,6 +46,7 @@ const opts = {
     secretOrKey: "airgyaan"
 }
 passport.use(new JwtStrategy(opts, function (jwt_payload, done) {
+    console.log(jwt_payload);
     User.findOne({ id: jwt_payload.sub }, function (err, user) {
         if (err) {
             return done(err, false);
@@ -67,7 +68,7 @@ app.get('/', function (req, res) {
 // CHANGE THE ROUTES ACC TO APP
 // res.render("pages/success", { name: req.user.name, email: req.user.email, pic: req.user.pic });
 app.get('/success', passport.authenticate('jwt', { session: false }), (req, res) => {
-    res.send('Worked! User id is: ' + req.user._id);
+    res.json({message: "Success!"});
 });
 app.get('/error', (req, res) => res.send("error logging in"));
 
